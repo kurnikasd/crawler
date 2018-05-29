@@ -265,8 +265,10 @@ func main() {
 	//heleo3
 
 	seed_url := os.Args[1]
+    sqlite_db_path := os.Getenv("GOPATH")+"/db/crawl.db"
+    fmt.Println("db_path: ", sqlite_db_path)
 
-	mydb := db.DbInstance{DBPath: "../db/crawl.db"}
+	mydb := db.DbInstance{DBPath: sqlite_db_path}
 	mydb.GetDbInstance()
 	defer mydb.CloseDB()
 
