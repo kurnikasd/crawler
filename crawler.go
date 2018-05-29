@@ -253,7 +253,6 @@ func main() {
 	max_procs = runtime.GOMAXPROCS(8)
 	fmt.Println("GOMAXPROCS", max_procs)
 
-	//seed_url := "http://yual.pw/gt/"
 	//seed_url := "https://www.yahoo.com"
 	//seed_url := "https://hulu.com"
 
