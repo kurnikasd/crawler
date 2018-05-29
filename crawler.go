@@ -255,7 +255,7 @@ func main() {
 
 	//seed_url := "https://www.yahoo.com"
 	//seed_url := "https://hulu.com"
-	//heleo2
+	//heleo3
 
 	seed_url := os.Args[1]
 
