@@ -58,6 +58,7 @@ type YCrawler struct {
 	debug_level int
 	seed_url    string
 	domain      string
+	domain_id   int
 	base_url    string
 	visited     map[string]int
 	dbi         *db.DbInstance
@@ -209,12 +210,11 @@ func (crl *YCrawler) addParamsToDB(params []string, path string, p_type string) 
 	if len(params) == 0 {
 		return
 	}
-	domain_id := crl.dbi.GetDomainId(crl.domain)
-	path_id := crl.dbi.GetPathId(domain_id, path)
+	path_id := crl.dbi.GetPathId(crl.domain_id, path)
 
 	if path_id == 0 {
-		crl.dbi.AddPathByDomainId(path, domain_id)
-		path_id = crl.dbi.GetPathId(domain_id, path)
+		crl.dbi.AddPathByDomainId(path, crl.domain_id)
+		path_id = crl.dbi.GetPathId(crl.domain_id, path)
 	}
 
 	for _, p := range params {
@@ -235,11 +235,18 @@ func InitCrawler(seed_url string, debug_level int, dbi *db.DbInstance) YCrawler 
 	var baseURLRegexp = regexp.MustCompile(`^(https?:\/\/([a-zA-Z0-9_\.-]+))\/?.*$`)
 	baseURL := baseURLRegexp.FindStringSubmatch(seed_url)[1]
 	domain := baseURLRegexp.FindStringSubmatch(seed_url)[2]
+	domain_id := dbi.GetDomainId(domain)
+	if domain_id == 0 {
+		dbi.AddDomain(domain)
+		domain_id = dbi.GetDomainId(domain)
+	}
+
 	crl := YCrawler{
 		&myQueue{[]string{}, sync.Mutex{}},
 		debug_level,
 		seed_url,
 		domain,
+		domain_id,
 		baseURL,
 		map[string]int{},
 		dbi}

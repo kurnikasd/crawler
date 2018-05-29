@@ -99,3 +99,8 @@ func (x *DbInstance) AddParamByPathId(param string, param_type string, path_id i
 	_, err := x.dbi.Exec("INSERT INTO params (path_id, param_name, param_type) VALUES (?,?,?)", path_id, param, param_type)
 	checkErr(err)
 }
+
+func (x *DbInstance) AddDomain(domain string) {
+	_, err := x.dbi.Exec("INSERT INTO domains (domain) VALUES (?)", domain)
+	checkErr(err)
+}
