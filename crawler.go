@@ -13,6 +13,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
+//123
 type myQueue struct {
 	q []string
 	m sync.Mutex
@@ -265,8 +266,8 @@ func main() {
 	//heleo3
 
 	seed_url := os.Args[1]
-    sqlite_db_path := os.Getenv("GOPATH")+"/db/crawl.db"
-    fmt.Println("db_path: ", sqlite_db_path)
+	sqlite_db_path := os.Getenv("GOPATH") + "/db/crawl.db"
+	fmt.Println("db_path: ", sqlite_db_path)
 
 	mydb := db.DbInstance{DBPath: sqlite_db_path}
 	mydb.GetDbInstance()
