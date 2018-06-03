@@ -13,28 +13,33 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-//123
+type queueFrame struct {
+	link  string
+	depth int
+}
+
 type myQueue struct {
-	q []string
+	q []queueFrame
 	m sync.Mutex
 }
 
-func (q *myQueue) push(x string) {
+func (q *myQueue) push(x string, d int) {
 	(*q).m.Lock()
-	(*q).q = append((*q).q, x)
+	(*q).q = append((*q).q, queueFrame{x, d})
 	(*q).m.Unlock()
 }
 
-func (q *myQueue) pop() string {
+func (q *myQueue) pop() (string, int) {
 	(*q).m.Lock()
-	x := (*q).q[0]
+	x := (*q).q[0].link
+	d := (*q).q[0].depth
 	if len((*q).q) == 1 {
-		(*q).q = []string{}
+		(*q).q = []queueFrame{}
 	} else {
 		(*q).q = (*q).q[1:]
 	}
 	(*q).m.Unlock()
-	return x
+	return x, d
 }
 
 func (q *myQueue) debug() {
@@ -56,6 +61,7 @@ func (q *myQueue) isEmpty() bool {
 
 type YCrawler struct {
 	queue       *myQueue
+	max_depth   int
 	debug_level int
 	seed_url    string
 	domain      string
@@ -93,7 +99,10 @@ func (crl *YCrawler) Crawl() {
 			crl.Log("crawl: The queue is empty!", 0)
 			return
 		}
-		url := crl.queue.pop()
+		url, depth := crl.queue.pop()
+		if crl.max_depth > 0 && depth > crl.max_depth {
+			continue
+		}
 		//fmt.Println("crawl: Popped ", url)
 		//queue.debug()
 		urlsch := make(chan string)
@@ -105,7 +114,7 @@ func (crl *YCrawler) Crawl() {
 		func(c chan string) {
 			for x := range c {
 				//fmt.Println("crawl: Pushing url ", x)
-				crl.queue.push(x)
+				crl.queue.push(x, depth+1)
 			}
 		}(urlsch)
 	}
@@ -232,7 +241,7 @@ func (crl *YCrawler) extractParams(parsed_link *url.URL) []string {
 	return r
 }
 
-func InitCrawler(seed_url string, debug_level int, dbi *db.DbInstance) YCrawler {
+func InitCrawler(seed_url string, max_depth int, debug_level int, dbi *db.DbInstance) YCrawler {
 	var baseURLRegexp = regexp.MustCompile(`^(https?:\/\/([a-zA-Z0-9_\.-]+))\/?.*$`)
 	baseURL := baseURLRegexp.FindStringSubmatch(seed_url)[1]
 	domain := baseURLRegexp.FindStringSubmatch(seed_url)[2]
@@ -243,7 +252,8 @@ func InitCrawler(seed_url string, debug_level int, dbi *db.DbInstance) YCrawler 
 	}
 
 	crl := YCrawler{
-		&myQueue{[]string{}, sync.Mutex{}},
+		&myQueue{[]queueFrame{}, sync.Mutex{}},
+		max_depth,
 		debug_level,
 		seed_url,
 		domain,
@@ -251,7 +261,7 @@ func InitCrawler(seed_url string, debug_level int, dbi *db.DbInstance) YCrawler 
 		baseURL,
 		map[string]int{},
 		dbi}
-	crl.queue.push(seed_url)
+	crl.queue.push(seed_url, 0)
 	return crl
 }
 
