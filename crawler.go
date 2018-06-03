@@ -276,6 +276,7 @@ func main() {
 	//heleo3
 
 	seed_url := os.Args[1]
+	max_depth = os.Args[2]
 	sqlite_db_path := os.Getenv("GOPATH") + "/db/crawl.db"
 	fmt.Println("db_path: ", sqlite_db_path)
 
@@ -283,6 +284,6 @@ func main() {
 	mydb.GetDbInstance()
 	defer mydb.CloseDB()
 
-	crawler := InitCrawler(seed_url, 2, &mydb)
+	crawler := InitCrawler(seed_url, max_depth, 2, &mydb)
 	crawler.Crawl()
 }
