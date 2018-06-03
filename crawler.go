@@ -7,6 +7,7 @@ import (
 	"os"
 	"regexp"
 	"runtime"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -276,7 +277,12 @@ func main() {
 	//heleo3
 
 	seed_url := os.Args[1]
-	max_depth := os.Args[2]
+	max_depth_s := os.Args[2]
+
+	if max_depth, err := strconv.Atoi(max_depth_s); err != nil {
+		panic(err)
+	}
+
 	sqlite_db_path := os.Getenv("GOPATH") + "/db/crawl.db"
 	fmt.Println("db_path: ", sqlite_db_path)
 
