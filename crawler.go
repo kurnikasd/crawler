@@ -279,7 +279,8 @@ func main() {
 	seed_url := os.Args[1]
 	max_depth_s := os.Args[2]
 
-	if max_depth, err := strconv.Atoi(max_depth_s); err != nil {
+	max_depth, err := strconv.Atoi(max_depth_s)
+	if err != nil {
 		panic(err)
 	}
 
