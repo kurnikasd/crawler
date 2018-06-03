@@ -92,7 +92,7 @@ func (crl *YCrawler) normalizeURL(link, url string) string {
 }
 
 func (crl *YCrawler) Crawl() {
-	crl.queue.push(crl.seed_url)
+	//crl.queue.push(crl.seed_url, 0)
 	crl.Log("crawl: running on "+crl.domain+", seed_url is "+crl.seed_url, 0)
 	for {
 		if crl.queue.isEmpty() {
