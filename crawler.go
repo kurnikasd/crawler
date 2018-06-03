@@ -276,7 +276,7 @@ func main() {
 	//heleo3
 
 	seed_url := os.Args[1]
-	max_depth = os.Args[2]
+	max_depth := os.Args[2]
 	sqlite_db_path := os.Getenv("GOPATH") + "/db/crawl.db"
 	fmt.Println("db_path: ", sqlite_db_path)
 
