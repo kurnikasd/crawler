@@ -79,7 +79,12 @@ func (crl *YCrawler) Log(message string, level int) {
 }
 
 func (crl *YCrawler) normalizeURL(link, url string) string {
-	var normalized_url string = link
+	// remove one trailing slash
+    s_url := strings.Split(url, "/")
+    if s_url[len(s_url)-1] == "" {
+            url = url[:len(url)-1]
+    }
+    var normalized_url string = link
 	if strings.HasPrefix(link, "//") {
 		normalized_url = strings.Split(link, ":")[0] + "://" + link
 	} else if strings.HasPrefix(link, "/") {
@@ -87,13 +92,12 @@ func (crl *YCrawler) normalizeURL(link, url string) string {
 	} else if strings.HasPrefix(link, "http") {
 		normalized_url = link
 	} else {
-		normalized_url = url + link
+		normalized_url = url + "/" + link
 	}
 	return strings.Split(normalized_url, "#")[0]
 }
 
 func (crl *YCrawler) Crawl() {
-	//crl.queue.push(crl.seed_url, 0)
 	crl.Log("crawl: running on "+crl.domain+", seed_url is "+crl.seed_url, 0)
 	for {
 		if crl.queue.isEmpty() {
@@ -105,7 +109,9 @@ func (crl *YCrawler) Crawl() {
 			continue
 		}
 		//fmt.Println("crawl: Popped ", url)
-		//queue.debug()
+        if (crl.debug_level > 10) {
+		    crl.queue.debug()
+        }
 		urlsch := make(chan string)
 		go func() {
 			//fmt.Println(url)
@@ -114,7 +120,7 @@ func (crl *YCrawler) Crawl() {
 
 		func(c chan string) {
 			for x := range c {
-				//fmt.Println("crawl: Pushing url ", x)
+				crl.Log("crawl: Pushing url " + x + " Depth " + strconv.Itoa(depth+1), 7)
 				crl.queue.push(x, depth+1)
 			}
 		}(urlsch)
@@ -266,6 +272,15 @@ func InitCrawler(seed_url string, max_depth int, debug_level int, dbi *db.DbInst
 	return crl
 }
 
+/*  Debug levels:
+*   0 - show always, critical messages
+*   1 - info about url currently fetching
+*   2 - fetching debug (e.g. visited urls, found forms and so on)
+*   3 - debugging info about all links on the page
+*   7 - debugging info about pushing to the queue
+*   10 - debug queue
+*/
+
 func main() {
 	max_procs := runtime.GOMAXPROCS(8)
 	fmt.Println("GOMAXPROCS", max_procs)
@@ -291,6 +306,6 @@ func main() {
 	mydb.GetDbInstance()
 	defer mydb.CloseDB()
 
-	crawler := InitCrawler(seed_url, max_depth, 2, &mydb)
+	crawler := InitCrawler(seed_url, max_depth, 1, &mydb)
 	crawler.Crawl()
 }
