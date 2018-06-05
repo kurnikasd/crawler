@@ -299,12 +299,19 @@ func main() {
 		panic(err)
 	}
 
-	sqlite_db_path := os.Getenv("GOPATH") + "/db/crawl.db"
+	sep := string(os.PathSeparator)
+	sqlite_db_path := os.Getenv("GOPATH") + sep + "db" + sep + "crawl.db"
 	fmt.Println("db_path: ", sqlite_db_path)
 
-	mydb := db.DbInstance{DBPath: sqlite_db_path}
+	//mydb := db.SQLiteInstance{DBPath: sqlite_db_path}
+	mydb := db.DbInstance{DbEngine: "mysql", ConnectionString: "root:@/crawl"}
 	mydb.GetDbInstance()
+	x := mydb.GetDomains()
+	fmt.Println(x)
 	defer mydb.CloseDB()
+
+	if seed_url == "" || max_depth == 1 {
+	}
 
 	crawler := InitCrawler(seed_url, max_depth, 1, &mydb)
 	crawler.Crawl()

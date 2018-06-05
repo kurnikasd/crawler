@@ -3,6 +3,7 @@ package db
 import (
 	"database/sql"
 
+	_ "github.com/go-sql-driver/mysql"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -12,13 +13,46 @@ func checkErr(err error) {
 	}
 }
 
-type DbInstance struct {
+/*
+type DbInstance interface {
+	GetDbInstance()
+	CloseDB()
+	GetDomains() []string
+	InsertURL(url string, domain string)
+	GetDomainId(domain string) int
+	GetPathId(domain_id int, path string) int
+	GetParams(domain_id int, path_id int) []string
+	AddPathByDomainId(path string, domain_id int)
+	AddParamByPathId(param string, param_type string, path_id int)
+	AddDomain(domain string)
+}
+
+
+type SQLiteInstance struct {
 	DBPath string
 	dbi    *sql.DB
 }
 
+type MySQLInstance struct {
+	ConnectionString string
+	dbi              *sql.DB
+}
+*/
+
+type DbInstance struct {
+	DbEngine         string
+	ConnectionString string
+	dbi              *sql.DB
+	insertOperator   string
+}
+
 func (x *DbInstance) GetDbInstance() {
-	dbi, err := sql.Open("sqlite3", x.DBPath)
+	if x.DbEngine == "mysql" {
+		x.insertOperator = "INSERT IGNORE "
+	} else {
+		x.insertOperator = "INSERT "
+	}
+	dbi, err := sql.Open(x.DbEngine, x.ConnectionString)
 	checkErr(err)
 	x.dbi = dbi
 }
@@ -47,7 +81,7 @@ func (x *DbInstance) InsertURL(url string, domain string) {
 	checkErr(err)
 	err = stmt.QueryRow(domain).Scan(&domain_id)
 	checkErr(err)
-	_, err = x.dbi.Exec("INSERT INTO paths VALUES (?,?)", domain_id, domain)
+	_, err = x.dbi.Exec(x.insertOperator+"INTO paths VALUES (?,?)", domain_id, domain)
 	checkErr(err)
 }
 
@@ -91,16 +125,16 @@ func (x *DbInstance) GetParams(domain_id int, path_id int) []string {
 }
 
 func (x *DbInstance) AddPathByDomainId(path string, domain_id int) {
-	_, err := x.dbi.Exec("INSERT INTO paths (domain_id, path) VALUES (?,?)", domain_id, path)
+	_, err := x.dbi.Exec(x.insertOperator+"INTO paths (domain_id, path) VALUES (?,?)", domain_id, path)
 	checkErr(err)
 }
 
 func (x *DbInstance) AddParamByPathId(param string, param_type string, path_id int) {
-	_, err := x.dbi.Exec("INSERT INTO params (path_id, param_name, param_type) VALUES (?,?,?)", path_id, param, param_type)
+	_, err := x.dbi.Exec(x.insertOperator+"INTO params (path_id, param_name, param_type) VALUES (?,?,?)", path_id, param, param_type)
 	checkErr(err)
 }
 
 func (x *DbInstance) AddDomain(domain string) {
-	_, err := x.dbi.Exec("INSERT INTO domains (domain) VALUES (?)", domain)
+	_, err := x.dbi.Exec(x.insertOperator+"INTO domains (domain) VALUES (?)", domain)
 	checkErr(err)
 }
