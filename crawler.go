@@ -2,7 +2,10 @@ package main
 
 import (
 	"crawler/db"
+	"encoding/json"
 	"fmt"
+	"io/ioutil"
+	"log"
 	"net/url"
 	"os"
 	"regexp"
@@ -70,11 +73,22 @@ type YCrawler struct {
 	base_url    string
 	visited     map[string]int
 	dbi         *db.DbInstance
+	log_file    string
 }
 
-func (crl *YCrawler) Log(message string, level int) {
+func (crl *YCrawler) Log(message string, level int, outFile string) {
 	if level <= crl.debug_level {
-		fmt.Println(message)
+		if outFile != "stdout" {
+			f, err := os.OpenFile(outFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+			if err != nil {
+				panic(err)
+			}
+			defer f.Close()
+			log.SetOutput(f)
+			log.Println(message)
+		} else {
+			fmt.Println(message)
+		}
 	}
 }
 
@@ -98,10 +112,10 @@ func (crl *YCrawler) normalizeURL(link, url string) string {
 }
 
 func (crl *YCrawler) Crawl() {
-	crl.Log("crawl: running on "+crl.domain+", seed_url is "+crl.seed_url, 0)
+	crl.Log("crawl: running on "+crl.domain+", seed_url is "+crl.seed_url, 0, crl.log_file)
 	for {
 		if crl.queue.isEmpty() {
-			crl.Log("crawl: The queue is empty!", 0)
+			crl.Log("crawl: The queue is empty!", 0, crl.log_file)
 			return
 		}
 		url, depth := crl.queue.pop()
@@ -120,7 +134,7 @@ func (crl *YCrawler) Crawl() {
 
 		func(c chan string) {
 			for x := range c {
-				crl.Log("crawl: Pushing url "+x+" Depth "+strconv.Itoa(depth+1), 7)
+				crl.Log("crawl: Pushing url "+x+" Depth "+strconv.Itoa(depth+1), 7, crl.log_file)
 				crl.queue.push(x, depth+1)
 			}
 		}(urlsch)
@@ -129,11 +143,11 @@ func (crl *YCrawler) Crawl() {
 
 func (crl *YCrawler) Fetch(url string, c chan string) {
 	if _, ok := crl.visited[url]; ok {
-		crl.Log("fetch: "+url+" visited", 2)
+		crl.Log("fetch: "+url+" visited", 2, crl.log_file)
 		close(c)
 		return
 	}
-	crl.Log("fetching "+url, 1)
+	crl.Log("fetching "+url, 1, crl.log_file)
 	crl.visited[url] = 1
 	urls := crl.collectUrls(url)
 	for _, s := range urls {
@@ -146,7 +160,7 @@ func (crl *YCrawler) Fetch(url string, c chan string) {
 func (crl *YCrawler) collectUrls(lnk string) []string {
 	doc, err := goquery.NewDocument(lnk)
 	if err != nil {
-		crl.Log("Cannot fetch url "+lnk+": "+err.Error(), 2)
+		crl.Log("Cannot fetch url "+lnk+": "+err.Error(), 2, crl.log_file)
 		return []string{}
 	}
 	var urls []string
@@ -200,14 +214,14 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 				crl.addParamsToDB(get_params, u.Path, "GET")
 
 				if form_found {
-					crl.Log("The form action = "+link+" method "+form_method+", enctype "+form_enctype+" found", 1)
+					crl.Log("The form action = "+link+" method "+form_method+", enctype "+form_enctype+" found", 1, crl.log_file)
 					crl.addParamsToDB(post_params, u.Path, form_method)
 				}
 
-				crl.Log("\t--> "+normalized_url, 3)
+				crl.Log("\t--> "+normalized_url, 3, crl.log_file)
 				urls = append(urls, normalized_url)
 			} else {
-				crl.Log("Same host restriction for foreign url "+normalized_url, 3)
+				crl.Log("Same host restriction for foreign url "+normalized_url, 3, crl.log_file)
 			}
 		})
 	return urls
@@ -248,7 +262,7 @@ func (crl *YCrawler) extractParams(parsed_link *url.URL) []string {
 	return r
 }
 
-func InitCrawler(seed_url string, max_depth int, debug_level int, dbi *db.DbInstance) YCrawler {
+func InitCrawler(seed_url, log_file string, max_depth int, debug_level int, dbi *db.DbInstance) YCrawler {
 	var baseURLRegexp = regexp.MustCompile(`^(https?:\/\/([a-zA-Z0-9_\.-]+))\/?.*$`)
 	baseURL := baseURLRegexp.FindStringSubmatch(seed_url)[1]
 	domain := baseURLRegexp.FindStringSubmatch(seed_url)[2]
@@ -267,7 +281,8 @@ func InitCrawler(seed_url string, max_depth int, debug_level int, dbi *db.DbInst
 		domain_id,
 		baseURL,
 		map[string]int{},
-		dbi}
+		dbi,
+		log_file}
 	crl.queue.push(seed_url, 0)
 	return crl
 }
@@ -281,20 +296,46 @@ func InitCrawler(seed_url string, max_depth int, debug_level int, dbi *db.DbInst
 *   10 - debug queue
  */
 
+// Seed URL, depth, and log_level can be passed in args in this order
+// These parameters can be also set in the crawler.conf file
+// Also in that file we can set max_procs, max_depth, db_engine, DB
 func main() {
-	max_procs := runtime.GOMAXPROCS(8)
-	fmt.Println("GOMAXPROCS", max_procs)
-	max_procs = runtime.GOMAXPROCS(8)
-	fmt.Println("GOMAXPROCS", max_procs)
+	configFile, e := ioutil.ReadFile("./crawler.conf")
+	if e != nil {
+		panic(e)
+	}
+	var configMap map[string]string
+	json.Unmarshal(configFile, &configMap)
 
-	//seed_url := "https://www.yahoo.com"
-	//seed_url := "https://hulu.com"
-	//heleo3
+	if len(os.Args) < 2 {
+		fmt.Println("Usage: " + os.Args[0] + " URL [depth] [log_level]")
+		os.Exit(1)
+	}
+
+	if len(os.Args) > 2 {
+		configMap["depth"] = os.Args[2]
+	} else {
+		configMap["depth"] = configMap["max_depth"]
+	}
+	if len(os.Args) > 3 {
+		configMap["log_level"] = os.Args[3]
+	} else {
+		configMap["log_level"] = "0"
+	}
+
+	//for k, v := range configMap {
+	//	fmt.Println(k, " => ", v)
+	//}
+
+	max_procs, err := strconv.Atoi(configMap["max_procs"])
+	if err != nil {
+		panic(err)
+	}
+	runtime.GOMAXPROCS(max_procs)
 
 	seed_url := os.Args[1]
-	max_depth_s := os.Args[2]
 
-	max_depth, err := strconv.Atoi(max_depth_s)
+	max_depth, err := strconv.Atoi(configMap["depth"])
 	if err != nil {
 		panic(err)
 	}
@@ -304,15 +345,15 @@ func main() {
 	fmt.Println("db_path: ", sqlite_db_path)
 
 	//mydb := db.SQLiteInstance{DBPath: sqlite_db_path}
-	mydb := db.DbInstance{DbEngine: "mysql", ConnectionString: "root:@/crawl"}
+	mydb := db.DbInstance{DbEngine: configMap["db_engine"],
+		ConnectionString: configMap["db_connection_string"]}
 	mydb.GetDbInstance()
-	x := mydb.GetDomains()
-	fmt.Println(x)
 	defer mydb.CloseDB()
 
-	if seed_url == "" || max_depth == 1 {
+	if len(configMap["log_file"]) == 0 {
+		configMap["log_file"] = "stdout"
 	}
 
-	crawler := InitCrawler(seed_url, max_depth, 1, &mydb)
+	crawler := InitCrawler(seed_url, configMap["log_file"], max_depth, 1, &mydb)
 	crawler.Crawl()
 }
