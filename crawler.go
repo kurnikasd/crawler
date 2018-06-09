@@ -64,16 +64,18 @@ func (q *myQueue) isEmpty() bool {
 }
 
 type YCrawler struct {
-	queue       *myQueue
-	max_depth   int
-	debug_level int
-	seed_url    string
-	domain      string
-	domain_id   int
-	base_url    string
-	visited     map[string]int
-	dbi         *db.DbInstance
-	log_file    string
+	queue            *myQueue
+	max_depth        int
+	debug_level      int
+	seed_url         string
+	domain           string
+	domain_id        int
+	base_url         string
+	visited          map[string]int
+	dbi              *db.DbInstance
+	log_file         string
+	depth_cnt        map[int]int
+	max_cnt_on_depth int
 }
 
 func (crl *YCrawler) Log(message string, level int, outFile string) {
@@ -122,14 +124,14 @@ func (crl *YCrawler) Crawl() {
 		if crl.max_depth > 0 && depth > crl.max_depth {
 			continue
 		}
-		//fmt.Println("crawl: Popped ", url)
+		//fmt.Println("crawl: Popped ", url) //DEBUG
 		if crl.debug_level > 10 {
 			crl.queue.debug()
 		}
 		urlsch := make(chan string)
 		go func() {
 			//fmt.Println(url)
-			crl.Fetch(url, urlsch)
+			crl.Fetch(url, urlsch, depth)
 		}()
 
 		func(c chan string) {
@@ -141,14 +143,23 @@ func (crl *YCrawler) Crawl() {
 	}
 }
 
-func (crl *YCrawler) Fetch(url string, c chan string) {
+func (crl *YCrawler) Fetch(url string, c chan string, depth int) {
+	var error bool = false
 	if _, ok := crl.visited[url]; ok {
 		crl.Log("fetch: "+url+" visited", 2, crl.log_file)
+		error = true
+	}
+	if crl.depth_cnt[depth] >= crl.max_cnt_on_depth {
+		crl.Log("fetch: ("+url+") maximum cnt on depth "+strconv.Itoa(depth), 2, crl.log_file)
+		error = true
+	}
+	if error {
 		close(c)
 		return
 	}
 	crl.Log("fetching "+url, 1, crl.log_file)
 	crl.visited[url] = 1
+	crl.depth_cnt[depth] += 1
 	urls := crl.collectUrls(url)
 	for _, s := range urls {
 		c <- s
@@ -204,7 +215,7 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 
 			normalized_url := crl.normalizeURL(link, lnk)
 
-			if crl.isSameDomain(normalized_url) && !crl.isStaticURL(normalized_url) {
+			if crl.checkRestrictions(normalized_url) {
 				u, err := url.Parse(normalized_url)
 				if err != nil {
 					panic(err)
@@ -220,11 +231,21 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 
 				crl.Log("\t--> "+normalized_url, 3, crl.log_file)
 				urls = append(urls, normalized_url)
-			} else {
-				crl.Log("Same host restriction for foreign url "+normalized_url, 3, crl.log_file)
 			}
 		})
 	return urls
+}
+
+func (crl *YCrawler) checkRestrictions(link string) bool {
+	if !crl.isSameDomain(link) {
+		crl.Log("Same host restriction for foreign url "+link, 3, crl.log_file)
+		return false
+	}
+	if crl.isStaticURL(link) {
+		crl.Log("Static content restriction "+link, 3, crl.log_file)
+		return false
+	}
+	return true
 }
 
 func (crl *YCrawler) isSameDomain(link string) bool {
@@ -262,7 +283,7 @@ func (crl *YCrawler) extractParams(parsed_link *url.URL) []string {
 	return r
 }
 
-func InitCrawler(seed_url, log_file string, max_depth int, debug_level int, dbi *db.DbInstance) YCrawler {
+func InitCrawler(seed_url, log_file string, max_depth int, debug_level int, dbi *db.DbInstance, max_cnt_on_depth int) YCrawler {
 	var baseURLRegexp = regexp.MustCompile(`^(https?:\/\/([a-zA-Z0-9_\.-]+))\/?.*$`)
 	baseURL := baseURLRegexp.FindStringSubmatch(seed_url)[1]
 	domain := baseURLRegexp.FindStringSubmatch(seed_url)[2]
@@ -271,6 +292,7 @@ func InitCrawler(seed_url, log_file string, max_depth int, debug_level int, dbi 
 		dbi.AddDomain(domain)
 		domain_id = dbi.GetDomainId(domain)
 	}
+	depth_cnt := map[int]int{}
 
 	crl := YCrawler{
 		&myQueue{[]queueFrame{}, sync.Mutex{}},
@@ -282,7 +304,9 @@ func InitCrawler(seed_url, log_file string, max_depth int, debug_level int, dbi 
 		baseURL,
 		map[string]int{},
 		dbi,
-		log_file}
+		log_file,
+		depth_cnt,
+		max_cnt_on_depth}
 	crl.queue.push(seed_url, 0)
 	return crl
 }
@@ -340,6 +364,18 @@ func main() {
 		panic(err)
 	}
 
+	log_level, err := strconv.Atoi(configMap["log_level"])
+	if err != nil {
+		panic(err)
+	}
+
+	var max_cnt_on_depth int
+	max_cnt_on_depth, err = strconv.Atoi(configMap["max_cnt_on_depth"])
+	if err != nil {
+		max_cnt_on_depth = 1000
+	}
+	fmt.Println("max_cnt_on_depth ", max_cnt_on_depth) //DEBUG
+
 	sep := string(os.PathSeparator)
 	sqlite_db_path := os.Getenv("GOPATH") + sep + "db" + sep + "crawl.db"
 	fmt.Println("db_path: ", sqlite_db_path)
@@ -354,6 +390,6 @@ func main() {
 		configMap["log_file"] = "stdout"
 	}
 
-	crawler := InitCrawler(seed_url, configMap["log_file"], max_depth, 1, &mydb)
+	crawler := InitCrawler(seed_url, configMap["log_file"], max_depth, log_level, &mydb, max_cnt_on_depth)
 	crawler.Crawl()
 }
