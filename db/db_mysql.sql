@@ -6,13 +6,14 @@ CREATE TABLE domains (
 CREATE TABLE paths (
     id        INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     domain_id INTEGER,
-    path      VARCHAR (100) UNIQUE,
+    path      VARCHAR (100),
     scheme    VARCHAR (5) NOT NULL,
     checked   INTEGER,
     FOREIGN KEY (
         domain_id
     )
-    REFERENCES domains (id)
+    REFERENCES domains (id),
+    UNIQUE KEY `unique_index` (`path`,`domain_id`),
 );
 
 CREATE TABLE params (
