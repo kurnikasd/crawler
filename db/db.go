@@ -13,32 +13,6 @@ func checkErr(err error) {
 	}
 }
 
-/*
-type DbInstance interface {
-	GetDbInstance()
-	CloseDB()
-	GetDomains() []string
-	InsertURL(url string, domain string)
-	GetDomainId(domain string) int
-	GetPathId(domain_id int, path string) int
-	GetParams(domain_id int, path_id int) []string
-	AddPathByDomainId(path string, domain_id int)
-	AddParamByPathId(param string, param_type string, path_id int)
-	AddDomain(domain string)
-}
-
-
-type SQLiteInstance struct {
-	DBPath string
-	dbi    *sql.DB
-}
-
-type MySQLInstance struct {
-	ConnectionString string
-	dbi              *sql.DB
-}
-*/
-
 type DbInstance struct {
 	DbEngine         string
 	ConnectionString string
@@ -124,8 +98,8 @@ func (x *DbInstance) GetParams(domain_id int, path_id int) []string {
 	return result
 }
 
-func (x *DbInstance) AddPathByDomainId(path string, domain_id int) {
-	_, err := x.dbi.Exec(x.insertOperator+"INTO paths (domain_id, path) VALUES (?,?)", domain_id, path)
+func (x *DbInstance) AddPathByDomainId(path string, domain_id int, scheme string) {
+	_, err := x.dbi.Exec(x.insertOperator+"INTO paths (domain_id, path, scheme) VALUES (?,?,?)", domain_id, path, scheme)
 	checkErr(err)
 }
 

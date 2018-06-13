@@ -1,11 +1,16 @@
 package main
 
+//TODO: add 3xx to database in collectUrls
+//TODO remove prints
+//TODO work with scope
+
 import (
 	"crawler/db"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -169,7 +174,16 @@ func (crl *YCrawler) Fetch(url string, c chan string, depth int) {
 }
 
 func (crl *YCrawler) collectUrls(lnk string) []string {
-	doc, err := goquery.NewDocument(lnk)
+	resp, err := http.Get(lnk)
+	if err != nil {
+		return []string{}
+	}
+	if resp.Request.URL.Hostname() != crl.domain {
+		crl.Log("Restricting redirect to foreign domain "+resp.Request.URL.Hostname(), 2, crl.log_file)
+		return []string{}
+	}
+
+	doc, err := goquery.NewDocumentFromResponse(resp)
 	if err != nil {
 		crl.Log("Cannot fetch url "+lnk+": "+err.Error(), 2, crl.log_file)
 		return []string{}
@@ -222,11 +236,11 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 				}
 
 				get_params := crl.extractParams(u)
-				crl.addParamsToDB(get_params, u.Path, "GET")
+				crl.addParamsToDB(get_params, u.Path, "GET", u.Scheme)
 
 				if form_found {
 					crl.Log("The form action = "+link+" method "+form_method+", enctype "+form_enctype+" found", 1, crl.log_file)
-					crl.addParamsToDB(post_params, u.Path, form_method)
+					crl.addParamsToDB(post_params, u.Path, form_method, u.Scheme)
 				}
 
 				crl.Log("\t--> "+normalized_url, 3, crl.log_file)
@@ -258,14 +272,14 @@ func (crl *YCrawler) isStaticURL(link string) bool {
 	return rxStatic.MatchString(link)
 }
 
-func (crl *YCrawler) addParamsToDB(params []string, path string, p_type string) {
+func (crl *YCrawler) addParamsToDB(params []string, path string, p_type string, scheme string) {
 	if len(params) == 0 {
 		return
 	}
 	path_id := crl.dbi.GetPathId(crl.domain_id, path)
 
 	if path_id == 0 {
-		crl.dbi.AddPathByDomainId(path, crl.domain_id)
+		crl.dbi.AddPathByDomainId(path, crl.domain_id, scheme)
 		path_id = crl.dbi.GetPathId(crl.domain_id, path)
 	}
 
@@ -328,7 +342,7 @@ func main() {
 	if e != nil {
 		panic(e)
 	}
-	var configMap map[string]string
+	var configMap map[string]string = map[string]string{}
 	json.Unmarshal(configFile, &configMap)
 
 	if len(os.Args) < 2 {
@@ -388,6 +402,21 @@ func main() {
 
 	if len(configMap["log_file"]) == 0 {
 		configMap["log_file"] = "stdout"
+	}
+
+	resp, err := http.Get(seed_url)
+	if err != nil {
+		panic(err)
+	}
+	//fmt.Print(resp.Request.URL.Scheme, "://", resp.Request.URL.Hostname())
+	actualDomainArray := strings.Split(resp.Request.URL.Hostname(), ".")
+	if (len(actualDomainArray)) < 2 {
+		panic("main: Invalid url, exiting!")
+	}
+	actualDomain := strings.TrimSpace(strings.Join(actualDomainArray[len(actualDomainArray)-2:], "."))
+	if !strings.Contains(seed_url, actualDomain) {
+		fmt.Println("Domain " + actualDomain + " not in scope")
+		return
 	}
 
 	crawler := InitCrawler(seed_url, configMap["log_file"], max_depth, log_level, &mydb, max_cnt_on_depth)

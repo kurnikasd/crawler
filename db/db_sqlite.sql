@@ -23,8 +23,10 @@ CREATE TABLE paths (
     id        INTEGER       PRIMARY KEY AUTOINCREMENT,
     domain_id INTEGER,
     path      VARCHAR (100) UNIQUE ON CONFLICT IGNORE,
+    scheme    VARCHAR (5) NOT NULL,
+    checked   INTEGER,
     FOREIGN KEY (
         domain_id
     )
-    REFERENCES domains (id) 
+    REFERENCES domains (id)
 );

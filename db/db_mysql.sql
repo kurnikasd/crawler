@@ -7,10 +7,12 @@ CREATE TABLE paths (
     id        INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     domain_id INTEGER,
     path      VARCHAR (100) UNIQUE,
+    scheme    VARCHAR (5) NOT NULL,
+    checked   INTEGER,
     FOREIGN KEY (
         domain_id
     )
-    REFERENCES domains (id) 
+    REFERENCES domains (id)
 );
 
 CREATE TABLE params (
@@ -27,5 +29,3 @@ CREATE TABLE params (
         param_type
     )
 );
-
-
