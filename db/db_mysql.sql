@@ -6,7 +6,7 @@ CREATE TABLE domains (
 CREATE TABLE paths (
     id        INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
     domain_id INTEGER,
-    path      VARCHAR (100),
+    path      VARCHAR (300),
     scheme    VARCHAR (5) NOT NULL,
     checked   INTEGER,
     FOREIGN KEY (

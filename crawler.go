@@ -100,17 +100,19 @@ func (crl *YCrawler) Log(message string, level int, outFile string) {
 }
 
 func (crl *YCrawler) normalizeURL(link, url string) string {
-	// remove one trailing slash
+	// cut off the last slash with the filename
 	s_url := strings.Split(url, "/")
-	if s_url[len(s_url)-1] == "" {
-		url = url[:len(url)-1]
-	}
+	url = strings.Join(s_url[:len(s_url)-1], "/")
 	var normalized_url string = link
+	// Two leading slashes says that we should use the same scheme as for base URL
 	if strings.HasPrefix(link, "//") {
 		normalized_url = strings.Split(link, ":")[0] + "://" + link
 	} else if strings.HasPrefix(link, "/") {
+		// currently we are fobridden to move to another domain, so
+		// it cannot change while we are crawling
 		normalized_url = crl.base_url + link
 	} else if strings.HasPrefix(link, "http") {
+		//TODO: maybe add other schemes????
 		normalized_url = link
 	} else {
 		normalized_url = url + "/" + link
@@ -150,10 +152,12 @@ func (crl *YCrawler) Crawl() {
 
 func (crl *YCrawler) Fetch(url string, c chan string, depth int) {
 	var error bool = false
-	if _, ok := crl.visited[url]; ok {
-		crl.Log("fetch: "+url+" visited", 2, crl.log_file)
-		error = true
-	}
+	/*
+		if _, ok := crl.visited[url]; ok {
+			crl.Log("fetch: "+url+" visited", 2, crl.log_file)
+			error = true
+		}
+	*/
 	if crl.depth_cnt[depth] >= crl.max_cnt_on_depth {
 		crl.Log("fetch: ("+url+") maximum cnt on depth "+strconv.Itoa(depth), 2, crl.log_file)
 		error = true
@@ -163,7 +167,7 @@ func (crl *YCrawler) Fetch(url string, c chan string, depth int) {
 		return
 	}
 	crl.Log("fetching "+url, 1, crl.log_file)
-	crl.visited[url] = 1
+	//crl.visited[url] = 1
 	crl.depth_cnt[depth] += 1
 	urls := crl.collectUrls(url)
 	for _, s := range urls {
@@ -183,9 +187,24 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 		return []string{}
 	}
 
+	baseURL := lnk
+	currentURL, _ := url.Parse(baseURL)
+	if resp.Request.URL.RequestURI() != currentURL.RequestURI() {
+		baseURL = resp.Request.URL.Scheme + "://" +
+			resp.Request.URL.Hostname() +
+			resp.Request.URL.RequestURI()
+	}
+
+	if _, ok := crl.visited[baseURL]; ok {
+		crl.Log("collectUrls: "+baseURL+" visited", 2, crl.log_file)
+		return []string{}
+	}
+
+	crl.visited[baseURL] = 1
+
 	doc, err := goquery.NewDocumentFromResponse(resp)
 	if err != nil {
-		crl.Log("Cannot fetch url "+lnk+": "+err.Error(), 2, crl.log_file)
+		crl.Log("Cannot fetch url "+baseURL+": "+err.Error(), 2, crl.log_file)
 		return []string{}
 	}
 	var urls []string
@@ -227,7 +246,7 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 				return
 			}
 
-			normalized_url := crl.normalizeURL(link, lnk)
+			normalized_url := crl.normalizeURL(link, baseURL)
 
 			if crl.checkRestrictions(normalized_url) {
 				u, err := url.Parse(normalized_url)
@@ -325,6 +344,10 @@ func InitCrawler(seed_url, log_file string, max_depth int, debug_level int, dbi 
 	return crl
 }
 
+func usage() {
+	fmt.Println("Usage: " + os.Args[0] + " URL [depth] [log_level]")
+}
+
 /*  Debug levels:
 *   0 - show always, critical messages
 *   1 - info about url currently fetching
@@ -346,19 +369,20 @@ func main() {
 	json.Unmarshal(configFile, &configMap)
 
 	if len(os.Args) < 2 {
-		fmt.Println("Usage: " + os.Args[0] + " URL [depth] [log_level]")
+		usage()
 		os.Exit(1)
+	}
+
+	if len(os.Args) > 3 {
+		configMap["log_level"] = os.Args[3]
+	} else {
+		//configMap["log_level"] = "0"
 	}
 
 	if len(os.Args) > 2 {
 		configMap["depth"] = os.Args[2]
 	} else {
 		configMap["depth"] = configMap["max_depth"]
-	}
-	if len(os.Args) > 3 {
-		configMap["log_level"] = os.Args[3]
-	} else {
-		configMap["log_level"] = "0"
 	}
 
 	//for k, v := range configMap {
@@ -372,6 +396,18 @@ func main() {
 	runtime.GOMAXPROCS(max_procs)
 
 	seed_url := os.Args[1]
+
+	if len(configMap["log_file"]) == 0 {
+		configMap["log_file"] = "stdout"
+	}
+	if len(configMap["log_level"]) == 0 {
+		configMap["log_level"] = "0"
+	}
+	if len(configMap["depth"]) == 0 {
+		fmt.Println("Set the 'max_depth' parameter in the config or pass it in the argument")
+		usage()
+		os.Exit(1)
+	}
 
 	max_depth, err := strconv.Atoi(configMap["depth"])
 	if err != nil {
@@ -388,21 +424,12 @@ func main() {
 	if err != nil {
 		max_cnt_on_depth = 1000
 	}
-	fmt.Println("max_cnt_on_depth ", max_cnt_on_depth) //DEBUG
-
-	sep := string(os.PathSeparator)
-	sqlite_db_path := os.Getenv("GOPATH") + sep + "db" + sep + "crawl.db"
-	fmt.Println("db_path: ", sqlite_db_path)
 
 	//mydb := db.SQLiteInstance{DBPath: sqlite_db_path}
 	mydb := db.DbInstance{DbEngine: configMap["db_engine"],
 		ConnectionString: configMap["db_connection_string"]}
 	mydb.GetDbInstance()
 	defer mydb.CloseDB()
-
-	if len(configMap["log_file"]) == 0 {
-		configMap["log_file"] = "stdout"
-	}
 
 	resp, err := http.Get(seed_url)
 	if err != nil {

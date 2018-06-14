@@ -22,7 +22,7 @@ CREATE TABLE params (
 CREATE TABLE paths (
     id        INTEGER       PRIMARY KEY AUTOINCREMENT,
     domain_id INTEGER,
-    path      VARCHAR (100) UNIQUE ON CONFLICT IGNORE,
+    path      VARCHAR (300) UNIQUE ON CONFLICT IGNORE,
     scheme    VARCHAR (5) NOT NULL,
     checked   INTEGER,
     FOREIGN KEY (
