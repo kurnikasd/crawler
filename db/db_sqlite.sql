@@ -7,6 +7,7 @@ CREATE TABLE params (
     param_name VARCHAR (20),
     path_id    INTEGER,
     param_type VARCHAR (5),
+    value VARCHAR(1000),
     FOREIGN KEY (
         path_id
     )

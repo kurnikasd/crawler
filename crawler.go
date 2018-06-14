@@ -190,9 +190,11 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 	baseURL := lnk
 	currentURL, _ := url.Parse(baseURL)
 	if resp.Request.URL.RequestURI() != currentURL.RequestURI() {
-		baseURL = resp.Request.URL.Scheme + "://" +
+		/*	baseURL = resp.Request.URL.Scheme + "://" +
 			resp.Request.URL.Hostname() +
 			resp.Request.URL.RequestURI()
+		*/
+		baseURL = resp.Request.URL.String()
 	}
 
 	if _, ok := crl.visited[baseURL]; ok {
@@ -219,7 +221,7 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 			)
 
 			check_attrs := []string{"href", "src", "action"}
-			post_params := []string{}
+			post_params := [][]string{}
 
 			// For each HTML element check attributes which can contain an URL
 			// If we found athe "action" attribute we parse parameters
@@ -233,8 +235,9 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 						form_enctype, _ = item.Attr("enctype")
 						item.Find("input").Each(func(i int, x *goquery.Selection) {
 							input_name, _ := x.Attr("name")
+							value, _ := x.Attr("value")
 							//input_type, _ := x.Attr("type")
-							post_params = append(post_params, input_name)
+							post_params = append(post_params, []string{input_name, value})
 						})
 					}
 					break
@@ -291,7 +294,7 @@ func (crl *YCrawler) isStaticURL(link string) bool {
 	return rxStatic.MatchString(link)
 }
 
-func (crl *YCrawler) addParamsToDB(params []string, path string, p_type string, scheme string) {
+func (crl *YCrawler) addParamsToDB(params [][]string, path string, p_type string, scheme string) {
 	if len(params) == 0 {
 		return
 	}
@@ -303,15 +306,15 @@ func (crl *YCrawler) addParamsToDB(params []string, path string, p_type string, 
 	}
 
 	for _, p := range params {
-		crl.dbi.AddParamByPathId(p, p_type, path_id)
+		crl.dbi.AddParamByPathId(p[0], p[1], p_type, path_id)
 	}
 }
 
-func (crl *YCrawler) extractParams(parsed_link *url.URL) []string {
+func (crl *YCrawler) extractParams(parsed_link *url.URL) [][]string {
 	m, _ := url.ParseQuery(parsed_link.RawQuery)
-	r := []string{}
-	for x, _ := range m {
-		r = append(r, x)
+	r := [][]string{}
+	for k, v := range m {
+		r = append(r, []string{k, v[0]})
 	}
 	return r
 }

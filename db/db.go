@@ -103,8 +103,8 @@ func (x *DbInstance) AddPathByDomainId(path string, domain_id int, scheme string
 	checkErr(err)
 }
 
-func (x *DbInstance) AddParamByPathId(param string, param_type string, path_id int) {
-	_, err := x.dbi.Exec(x.insertOperator+"INTO params (path_id, param_name, param_type) VALUES (?,?,?)", path_id, param, param_type)
+func (x *DbInstance) AddParamByPathId(param string, value string, param_type string, path_id int) {
+	_, err := x.dbi.Exec(x.insertOperator+"INTO params (path_id, param_name, param_type, value) VALUES (?,?,?,?)", path_id, param, param_type, value)
 	checkErr(err)
 }
 
