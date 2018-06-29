@@ -31,3 +31,9 @@ CREATE TABLE paths (
     )
     REFERENCES domains (id)
 );
+
+CREATE TABLE alerts (
+    time    DATETIME,
+    module  VARCHAR (100),
+    message VARCHAR (1000)
+);

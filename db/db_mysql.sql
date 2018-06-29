@@ -31,3 +31,9 @@ CREATE TABLE params (
         param_type
     )
 );
+
+CREATE TABLE alerts (
+    time    DATETIME,
+    module  VARCHAR (100),
+    message VARCHAR (1000)
+);
