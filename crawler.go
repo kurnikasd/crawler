@@ -6,6 +6,7 @@ package main
 
 import (
 	"crawler/db"
+	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -106,7 +107,7 @@ func (crl *YCrawler) normalizeURL(link, url string) string {
 	var normalized_url string = link
 	// Two leading slashes says that we should use the same scheme as for base URL
 	if strings.HasPrefix(link, "//") {
-		normalized_url = strings.Split(link, ":")[0] + "://" + link
+		normalized_url = strings.Split(url, ":")[0] + ":" + link
 	} else if strings.HasPrefix(link, "/") {
 		// currently we are fobridden to move to another domain, so
 		// it cannot change while we are crawling
@@ -433,6 +434,10 @@ func main() {
 		ConnectionString: configMap["db_connection_string"]}
 	mydb.GetDbInstance()
 	defer mydb.CloseDB()
+
+	//proxyUrl, _ := url.Parse("https://localhost:8080")
+	//http.DefaultTransport = &http.Transport{Proxy: http.ProxyURL(proxyUrl)}
+	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
 	resp, err := http.Get(seed_url)
 	if err != nil {
