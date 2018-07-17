@@ -250,6 +250,16 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 				return
 			}
 
+			// Not-http link.
+			linkSplitted := strings.Split(link, "://")
+			if len(linkSplitted) > 1 {
+				scheme := linkSplitted[0]
+				if scheme != "http" && scheme != "https" {
+					crl.Log("Non-http link"+link, 10, crl.log_file)
+					return
+				}
+			}
+
 			normalized_url := crl.normalizeURL(link, baseURL)
 
 			if crl.checkRestrictions(normalized_url) {
