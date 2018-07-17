@@ -251,7 +251,7 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 			}
 
 			// Not-http link.
-			linkSplitted := strings.Split(link, "://")
+			linkSplitted := strings.Split(link, ":")
 			if len(linkSplitted) > 1 {
 				scheme := linkSplitted[0]
 				if scheme != "http" && scheme != "https" {
