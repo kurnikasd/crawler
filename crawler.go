@@ -179,10 +179,16 @@ func (crl *YCrawler) Fetch(url string, c chan string, depth int) {
 }
 
 func (crl *YCrawler) collectUrls(lnk string) []string {
+	if _, ok := crl.visited[lnk]; ok {
+		crl.Log("collectUrls: "+lnk+" visited", 2, crl.log_file)
+		return []string{}
+	}
+
 	resp, err := http.Get(lnk)
 	if err != nil {
 		return []string{}
 	}
+
 	if resp.Request.URL.Hostname() != crl.domain {
 		crl.Log("Restricting redirect to foreign domain "+resp.Request.URL.Hostname(), 2, crl.log_file)
 		return []string{}
@@ -196,11 +202,6 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 			resp.Request.URL.RequestURI()
 		*/
 		baseURL = resp.Request.URL.String()
-	}
-
-	if _, ok := crl.visited[baseURL]; ok {
-		crl.Log("collectUrls: "+baseURL+" visited", 2, crl.log_file)
-		return []string{}
 	}
 
 	crl.visited[baseURL] = 1
