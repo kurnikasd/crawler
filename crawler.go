@@ -167,7 +167,7 @@ func (crl *YCrawler) Fetch(url string, c chan string, depth int) {
 		close(c)
 		return
 	}
-	crl.Log("fetching "+url, 1, crl.log_file)
+
 	//crl.visited[url] = 1
 	crl.depth_cnt[depth] += 1
 	urls := crl.collectUrls(url)
@@ -183,6 +183,8 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 		crl.Log("collectUrls: "+lnk+" visited", 2, crl.log_file)
 		return []string{}
 	}
+
+	crl.Log("collectUrls: fetching "+lnk, 1, crl.log_file)
 
 	resp, err := http.Get(lnk)
 	if err != nil {
