@@ -67,6 +67,17 @@ func (x *DbInstance) GetDomainId(domain string) int {
 	return domain_id
 }
 
+func (x *DbInstance) CheckProjectId(project_id int) bool {
+	var proj_cnt int
+	stmt, err := x.dbi.Prepare("SELECT count(id) FROM projects WHERE id = ?")
+	checkErr(err)
+	err = stmt.QueryRow(project_id).Scan(&proj_cnt)
+	if proj_cnt == 0 {
+		return false
+	}
+	return true
+}
+
 func (x *DbInstance) GetPathId(domain_id int, path string) int {
 	var path_id int
 	stmt, err := x.dbi.Prepare("SELECT id FROM paths WHERE domain_id = ? AND path = ?")
@@ -108,7 +119,7 @@ func (x *DbInstance) AddParamByPathId(param string, value string, param_type str
 	checkErr(err)
 }
 
-func (x *DbInstance) AddDomain(domain string) {
-	_, err := x.dbi.Exec(x.insertOperator+"INTO domains (domain) VALUES (?)", domain)
+func (x *DbInstance) AddDomain(domain string, project_id int) {
+	_, err := x.dbi.Exec(x.insertOperator+"INTO domains (domain, project_id) VALUES (?,?)", domain, project_id)
 	checkErr(err)
 }

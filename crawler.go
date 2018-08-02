@@ -82,6 +82,7 @@ type YCrawler struct {
 	log_file         string
 	depth_cnt        map[int]int
 	max_cnt_on_depth int
+	project_id       int
 }
 
 func (crl *YCrawler) Log(message string, level int, outFile string) {
@@ -308,7 +309,7 @@ func (crl *YCrawler) isStaticURL(link string) bool {
 	return rxStatic.MatchString(link)
 }
 
-func (crl *YCrawler) addParamsToDB(params [][]string, path string, p_type string, scheme string) {
+func (crl *YCrawler) addParamsToDB(params [][]string, path, p_type, scheme string) {
 	if len(params) == 0 {
 		return
 	}
@@ -333,13 +334,20 @@ func (crl *YCrawler) extractParams(parsed_link *url.URL) [][]string {
 	return r
 }
 
-func InitCrawler(seed_url, log_file string, max_depth int, debug_level int, dbi *db.DbInstance, max_cnt_on_depth int) YCrawler {
+func InitCrawler(
+	seed_url, log_file string,
+	max_depth, debug_level, max_cnt_on_depth, project_id int,
+	dbi *db.DbInstance) YCrawler {
 	var baseURLRegexp = regexp.MustCompile(`^(https?:\/\/([a-zA-Z0-9_\.-]+))\/?.*$`)
 	baseURL := baseURLRegexp.FindStringSubmatch(seed_url)[1]
 	domain := baseURLRegexp.FindStringSubmatch(seed_url)[2]
 	domain_id := dbi.GetDomainId(domain)
 	if domain_id == 0 {
-		dbi.AddDomain(domain)
+		if !dbi.CheckProjectId(project_id) {
+			fmt.Println("Can't init crawler: no projects with id ", project_id)
+			os.Exit(1)
+		}
+		dbi.AddDomain(domain, project_id)
 		domain_id = dbi.GetDomainId(domain)
 	}
 	depth_cnt := map[int]int{}
@@ -356,13 +364,93 @@ func InitCrawler(seed_url, log_file string, max_depth int, debug_level int, dbi 
 		dbi,
 		log_file,
 		depth_cnt,
-		max_cnt_on_depth}
+		max_cnt_on_depth,
+		project_id}
 	crl.queue.push(seed_url, 0)
 	return crl
 }
 
 func usage() {
-	fmt.Println("Usage: " + os.Args[0] + " URL [depth] [log_level]")
+	fmt.Println("Usage: " + os.Args[0] + " URL [depth] [log_level] [config_file] [project_id]")
+}
+
+func parseConfig(config_file string) (map[string]string, bool) {
+	f, e := ioutil.ReadFile(config_file)
+	if e != nil {
+		return map[string]string{}, true
+	}
+	var configMap map[string]string = map[string]string{}
+	json.Unmarshal(f, &configMap)
+	return configMap, false
+}
+
+func parseArgs(args []string) (map[string]string, bool) {
+	cl_arg_names := []string{"url", "depth", "log_level", "config_file", "project_id"}
+	var configMap map[string]string = map[string]string{}
+	for i := 0; i < min(len(cl_arg_names), len(args)-1); i++ {
+		fmt.Println("arg " + cl_arg_names[i] + " found, value is " + args[i+1])
+		configMap[cl_arg_names[i]] = args[i+1]
+	}
+
+	config_file := "./crawler.conf"
+	if val, ok := configMap["config_file"]; ok {
+		config_file = val
+	}
+
+	configMap2, err := parseConfig(config_file)
+	if err {
+		fmt.Println("Can't open config file \"" + config_file + "\"")
+	}
+
+	for k, v := range configMap2 {
+		if _, ok := configMap[k]; !ok {
+			configMap[k] = v
+		}
+	}
+	if _, ok := configMap["url"]; !ok {
+		fmt.Println("Pass the 'url' parameter in the argument")
+		return nil, true
+	}
+	if _, ok := configMap["log_file"]; !ok {
+		configMap["log_level"] = "stdout"
+	}
+	return configMap, false
+}
+
+func validateNumericalArgs(configMap map[string]string) (map[string]int, bool) {
+	numeric_args := []string{"depth", "log_level", "project_id", "max_procs", "max_cnt_on_depth", "max_depth"}
+	var configMapNum map[string]int = map[string]int{}
+	for _, x := range numeric_args {
+		if val, ok := configMap[x]; ok {
+			intVal, err := strconv.Atoi(val)
+			if err != nil {
+				fmt.Println("validateNumericalArgs: param " + x + " must be integer")
+				return nil, true
+			}
+			configMapNum[x] = intVal
+		}
+	}
+	if _, ok := configMapNum["log_level"]; !ok {
+		configMapNum["log_level"] = 0
+	}
+	if _, ok := configMapNum["max_cnt_on_depth"]; !ok {
+		configMapNum["max_cnt_on_depth"] = 1000
+	}
+	if _, ok := configMapNum["project_id"]; !ok {
+		configMapNum["project_id"] = 1
+	}
+	if _, ok := configMapNum["depth"]; !ok {
+		fmt.Println("Set the 'max_depth' parameter in the config or pass it in the argument")
+		return nil, true
+	}
+	return configMapNum, false
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 /*  Debug levels:
@@ -378,71 +466,37 @@ func usage() {
 // These parameters can be also set in the crawler.conf file
 // Also in that file we can set max_procs, max_depth, db_engine, DB
 func main() {
-	configFile, e := ioutil.ReadFile("./crawler.conf")
-	if e != nil {
-		panic(e)
-	}
-	var configMap map[string]string = map[string]string{}
-	json.Unmarshal(configFile, &configMap)
-
 	if len(os.Args) < 2 {
 		usage()
 		os.Exit(1)
 	}
 
-	if len(os.Args) > 3 {
-		configMap["log_level"] = os.Args[3]
-	} else {
-		//configMap["log_level"] = "0"
+	configMap, err1 := parseArgs(os.Args)
+	if err1 {
+		fmt.Println("Can't parse args")
+		usage()
+		os.Exit(1)
 	}
-
-	if len(os.Args) > 2 {
-		configMap["depth"] = os.Args[2]
-	} else {
-		configMap["depth"] = configMap["max_depth"]
-	}
-
-	//for k, v := range configMap {
-	//	fmt.Println(k, " => ", v)
-	//}
-
-	max_procs, err := strconv.Atoi(configMap["max_procs"])
-	if err != nil {
-		panic(err)
-	}
-	runtime.GOMAXPROCS(max_procs)
-
-	seed_url := os.Args[1]
-
-	if len(configMap["log_file"]) == 0 {
-		configMap["log_file"] = "stdout"
-	}
-	if len(configMap["log_level"]) == 0 {
-		configMap["log_level"] = "0"
-	}
-	if len(configMap["depth"]) == 0 {
-		fmt.Println("Set the 'max_depth' parameter in the config or pass it in the argument")
+	configMapInt, err2 := validateNumericalArgs(configMap)
+	if err2 {
+		fmt.Println("Validation errors")
 		usage()
 		os.Exit(1)
 	}
 
-	max_depth, err := strconv.Atoi(configMap["depth"])
-	if err != nil {
-		panic(err)
-	}
+	/*
+		fmt.Println("Config Map")
+		for k, v := range configMap {
+			fmt.Println(k, " => ", v)
+		}
+		fmt.Println("Config Map Int")
+		for k, v := range configMapInt {
+			fmt.Println(k, " => ", v)
+		}
+	*/
 
-	log_level, err := strconv.Atoi(configMap["log_level"])
-	if err != nil {
-		panic(err)
-	}
+	runtime.GOMAXPROCS(configMapInt["max_procs"])
 
-	var max_cnt_on_depth int
-	max_cnt_on_depth, err = strconv.Atoi(configMap["max_cnt_on_depth"])
-	if err != nil {
-		max_cnt_on_depth = 1000
-	}
-
-	//mydb := db.SQLiteInstance{DBPath: sqlite_db_path}
 	mydb := db.DbInstance{DbEngine: configMap["db_engine"],
 		ConnectionString: configMap["db_connection_string"]}
 	mydb.GetDbInstance()
@@ -452,7 +506,7 @@ func main() {
 	//http.DefaultTransport = &http.Transport{Proxy: http.ProxyURL(proxyUrl)}
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
-	resp, err := http.Get(seed_url)
+	resp, err := http.Get(configMap["url"])
 	if err != nil {
 		panic(err)
 	}
@@ -462,11 +516,18 @@ func main() {
 		panic("main: Invalid url, exiting!")
 	}
 	actualDomain := strings.TrimSpace(strings.Join(actualDomainArray[len(actualDomainArray)-2:], "."))
-	if !strings.Contains(seed_url, actualDomain) {
+	if !strings.Contains(configMap["url"], actualDomain) {
 		fmt.Println("Domain " + actualDomain + " not in scope")
 		return
 	}
 
-	crawler := InitCrawler(seed_url, configMap["log_file"], max_depth, log_level, &mydb, max_cnt_on_depth)
+	crawler := InitCrawler(
+		configMap["url"],
+		configMap["log_file"],
+		configMapInt["max_depth"],
+		configMapInt["log_level"],
+		configMapInt["max_cnt_on_depth"],
+		configMapInt["project_id"],
+		&mydb)
 	crawler.Crawl()
 }
