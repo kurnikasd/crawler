@@ -305,7 +305,7 @@ func (crl *YCrawler) isSameDomain(link string) bool {
 }
 
 func (crl *YCrawler) isStaticURL(link string) bool {
-	var rxStatic = regexp.MustCompile(`(.*\.zip)|(.*\.js)|(.*\.css)|(.*\.pdf)|(.*\.woff)|(.*\.jpg)|(.*\.jpeg)|(.*\.doc.*)|(.*\.gif)|(.*\.png)|(.*\.avi)|(.*\.mpeg.*)|(.*\.mpg.*)`)
+	var rxStatic = regexp.MustCompile(`(.*\.zip)|(.*\.js)|(.*\.css)|(.*\.pdf)|(.*\.woff)|(.*\.jpg)|(.*\.jpeg)|(.*\.doc.*)|(.*\.gif)|(.*\.png)|(.*\.avi)|(.*\.mpeg.*)|(.*\.mpg.*)|(.*\.ppt.*)|(.*\.xls.*)`)
 	return rxStatic.MatchString(link)
 }
 

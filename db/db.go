@@ -49,6 +49,7 @@ func (x *DbInstance) GetDomains() []string {
 	return domain_list
 }
 
+/*
 func (x *DbInstance) InsertURL(url string, domain string) {
 	var domain_id string
 	stmt, err := x.dbi.Prepare("SELECT id FROM domains WHERE domain = ?")
@@ -58,6 +59,7 @@ func (x *DbInstance) InsertURL(url string, domain string) {
 	_, err = x.dbi.Exec(x.insertOperator+"INTO paths VALUES (?,?)", domain_id, domain)
 	checkErr(err)
 }
+*/
 
 func (x *DbInstance) GetDomainId(domain string) int {
 	var domain_id int
