@@ -111,6 +111,28 @@ func (x *DbInstance) GetParams(domain_id int, path_id int) []string {
 	return result
 }
 
+func (x *DbInstance) GetHeaders(project_id int) []string {
+	stmt, err := x.dbi.Prepare("SELECT header " +
+		"FROM custom_headers WHERE project_id = ?")
+	checkErr(err)
+	rows, err := stmt.Query(project_id)
+
+	if err != nil {
+		panic(err)
+	}
+	defer rows.Close()
+
+	var result []string
+
+	for rows.Next() {
+		var header string
+		rows.Scan(&header)
+		result = append(result, header)
+	}
+
+	return result
+}
+
 func (x *DbInstance) AddPathByDomainId(path string, domain_id int, scheme string) {
 	_, err := x.dbi.Exec(x.insertOperator+"INTO paths (domain_id, path, scheme) VALUES (?,?,?)", domain_id, path, scheme)
 	checkErr(err)

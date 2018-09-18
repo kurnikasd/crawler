@@ -21,6 +21,7 @@ import (
 	"sync"
 
 	"github.com/PuerkitoBio/goquery"
+	"golang.org/x/net/html"
 )
 
 type queueFrame struct {
@@ -83,6 +84,7 @@ type YCrawler struct {
 	depth_cnt        map[int]int
 	max_cnt_on_depth int
 	project_id       int
+	headers          []string
 }
 
 func (crl *YCrawler) Log(message string, level int, outFile string) {
@@ -187,7 +189,22 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 
 	crl.Log("collectUrls: fetching "+lnk, 1, crl.log_file)
 
-	resp, err := http.Get(lnk)
+	httpClient := &http.Client{}
+	req, _ := http.NewRequest("GET", lnk, nil)
+
+	var logoutRegexp = regexp.MustCompile(`(.*logout.*)|(.*logoff.*)`)
+	if !logoutRegexp.MatchString(lnk) {
+		for _, header := range crl.headers {
+			harr := strings.Split(header, ":")
+			if len(harr) > 1 {
+				fmt.Println("Setting header " + strings.Trim(harr[0], " ") + " " + strings.Trim(harr[1], " "))
+				req.Header.Set(strings.Trim(harr[0], " "), strings.Trim(harr[1], " "))
+			}
+		}
+	}
+
+	//resp, err := http.Get(lnk)
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		return []string{}
 	}
@@ -225,29 +242,60 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 				form_enctype string
 			)
 
-			check_attrs := []string{"href", "src", "action"}
+			check_attrs := []string{"href", "src"}
 			post_params := [][]string{}
 
-			// For each HTML element check attributes which can contain an URL
-			// If we found athe "action" attribute we parse parameters
-			// We don't want to send any more requests to this page in a way
-			// to parse form inputs, so it should be done now.
-			for _, tag := range check_attrs {
-				if link, ok = item.Attr(tag); ok {
-					if tag == "action" {
-						form_found = true
-						form_method, _ = item.Attr("method")
-						form_enctype, _ = item.Attr("enctype")
-						item.Find("input").Each(func(i int, x *goquery.Selection) {
-							input_name, _ := x.Attr("name")
-							value, _ := x.Attr("value")
-							//input_type, _ := x.Attr("type")
-							post_params = append(post_params, []string{input_name, value})
-						})
+			// We want to check HTML tags only
+			if len(item.Nodes) > 0 && item.Nodes[0].Type == html.ElementNode {
+				// At first, we'll check the "form" tag
+				// If we found it we parse parameters
+				// We don't want to send any more requests to this page in a way
+				// to parse form inputs, so it should be done now.
+				if item.Nodes[0].Data == "form" {
+					form_found = true
+					form_method, _ = item.Attr("method")
+					form_enctype, _ = item.Attr("enctype")
+					form_action, _ := item.Attr("action")
+					item.Find("input").Each(func(i int, x *goquery.Selection) {
+						input_name, _ := x.Attr("name")
+						value, _ := x.Attr("value")
+						//input_type, _ := x.Attr("type")
+						post_params = append(post_params, []string{input_name, value})
+					})
+					if len(form_action) == 0 {
+						link = baseURL
 					}
-					break
+				} else {
+					// For each HTML element check attributes which can contain an URL
+					for _, tag := range check_attrs {
+						if link, ok = item.Attr(tag); ok {
+							break
+						}
+					}
 				}
 			}
+			/*
+				// For each HTML element check attributes which can contain an URL
+				// If we found athe "action" attribute we parse parameters
+				// We don't want to send any more requests to this page in a way
+				// to parse form inputs, so it should be done now.
+				for _, tag := range check_attrs {
+					if link, ok = item.Attr(tag); ok {
+						if tag == "action" {
+							form_found = true
+							form_method, _ = item.Attr("method")
+							form_enctype, _ = item.Attr("enctype")
+							item.Find("input").Each(func(i int, x *goquery.Selection) {
+								input_name, _ := x.Attr("name")
+								value, _ := x.Attr("value")
+								//input_type, _ := x.Attr("type")
+								post_params = append(post_params, []string{input_name, value})
+							})
+						}
+						break
+					}
+				}
+			*/
 
 			// Element has no interesting attributes or they are empty.
 			if len(link) == 0 {
@@ -351,6 +399,7 @@ func InitCrawler(
 		domain_id = dbi.GetDomainId(domain)
 	}
 	depth_cnt := map[int]int{}
+	headers := dbi.GetHeaders(project_id)
 
 	crl := YCrawler{
 		&myQueue{[]queueFrame{}, sync.Mutex{}},
@@ -365,7 +414,8 @@ func InitCrawler(
 		log_file,
 		depth_cnt,
 		max_cnt_on_depth,
-		project_id}
+		project_id,
+		headers}
 	crl.queue.push(seed_url, 0)
 	return crl
 }
