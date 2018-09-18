@@ -255,14 +255,14 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 					form_found = true
 					form_method, _ = item.Attr("method")
 					form_enctype, _ = item.Attr("enctype")
-					form_action, _ := item.Attr("action")
+					link, _ = item.Attr("action")
 					item.Find("input").Each(func(i int, x *goquery.Selection) {
 						input_name, _ := x.Attr("name")
 						value, _ := x.Attr("value")
 						//input_type, _ := x.Attr("type")
 						post_params = append(post_params, []string{input_name, value})
 					})
-					if len(form_action) == 0 {
+					if len(link) == 0 {
 						link = baseURL
 					}
 				} else {
@@ -323,7 +323,7 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 				get_params := crl.extractParams(u)
 				crl.addParamsToDB(get_params, u.Path, "GET", u.Scheme)
 
-				if form_found {
+				if form_found == true {
 					crl.Log("The form action = "+link+" method "+form_method+", enctype "+form_enctype+" found", 1, crl.log_file)
 					crl.addParamsToDB(post_params, u.Path, form_method, u.Scheme)
 				}
