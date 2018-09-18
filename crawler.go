@@ -197,7 +197,7 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 		for _, header := range crl.headers {
 			harr := strings.Split(header, ":")
 			if len(harr) > 1 {
-				fmt.Println("Setting header " + strings.Trim(harr[0], " ") + " " + strings.Trim(harr[1], " "))
+				//fmt.Println("Setting header " + strings.Trim(harr[0], " ") + " " + strings.Trim(harr[1], " "))
 				req.Header.Set(strings.Trim(harr[0], " "), strings.Trim(harr[1], " "))
 			}
 		}
