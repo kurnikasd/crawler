@@ -65,7 +65,8 @@ func (x *DbInstance) GetDomainId(domain string, project_id int) int {
 	var domain_id int
 	stmt, err := x.dbi.Prepare("SELECT id FROM domains WHERE domain = ? AND project_id = ?")
 	checkErr(err)
-	err = stmt.QueryRow(domain).Scan(&domain_id)
+	err = stmt.QueryRow(domain, project_id).Scan(&domain_id)
+	checkErr(err)
 	return domain_id
 }
 
