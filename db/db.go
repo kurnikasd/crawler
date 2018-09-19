@@ -61,9 +61,9 @@ func (x *DbInstance) InsertURL(url string, domain string) {
 }
 */
 
-func (x *DbInstance) GetDomainId(domain string) int {
+func (x *DbInstance) GetDomainId(domain string, project_id int) int {
 	var domain_id int
-	stmt, err := x.dbi.Prepare("SELECT id FROM domains WHERE domain = ?")
+	stmt, err := x.dbi.Prepare("SELECT id FROM domains WHERE domain = ? AND project_id = ?")
 	checkErr(err)
 	err = stmt.QueryRow(domain).Scan(&domain_id)
 	return domain_id

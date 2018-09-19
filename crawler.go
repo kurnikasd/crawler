@@ -389,14 +389,14 @@ func InitCrawler(
 	var baseURLRegexp = regexp.MustCompile(`^(https?:\/\/([a-zA-Z0-9_\.-]+))\/?.*$`)
 	baseURL := baseURLRegexp.FindStringSubmatch(seed_url)[1]
 	domain := baseURLRegexp.FindStringSubmatch(seed_url)[2]
-	domain_id := dbi.GetDomainId(domain)
+	domain_id := dbi.GetDomainId(domain, project_id)
 	if domain_id == 0 {
 		if !dbi.CheckProjectId(project_id) {
 			fmt.Println("Can't init crawler: no projects with id ", project_id)
 			os.Exit(1)
 		}
 		dbi.AddDomain(domain, project_id)
-		domain_id = dbi.GetDomainId(domain)
+		domain_id = dbi.GetDomainId(domain, project_id)
 	}
 	depth_cnt := map[int]int{}
 	headers := dbi.GetHeaders(project_id)
