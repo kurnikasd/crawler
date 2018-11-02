@@ -191,6 +191,7 @@ func (crl *YCrawler) collectUrls(lnk string) []string {
 
 	httpClient := &http.Client{}
 	req, _ := http.NewRequest("GET", lnk, nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:58.0) Gecko/20100101 Firefox/58.0")
 
 	var logoutRegexp = regexp.MustCompile(`(.*logout.*)|(.*logoff.*)`)
 	if !logoutRegexp.MatchString(lnk) {
@@ -557,7 +558,12 @@ func main() {
 	//http.DefaultTransport = &http.Transport{Proxy: http.ProxyURL(proxyUrl)}
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
-	resp, err := http.Get(configMap["url"])
+	httpClient := &http.Client{}
+	req, _ := http.NewRequest("GET", configMap["url"], nil)
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:58.0) Gecko/20100101 Firefox/58.0")
+
+	//resp, err := http.Get(configMap["url"])
+	resp, err := httpClient.Do(req)
 	if err != nil {
 		panic(err)
 	}
