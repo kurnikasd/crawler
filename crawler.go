@@ -391,10 +391,10 @@ func InitCrawler(
 	baseURL := baseURLRegexp.FindStringSubmatch(seed_url)[1]
 	domain := baseURLRegexp.FindStringSubmatch(seed_url)[2]
 	domain_id := dbi.GetDomainId(domain, project_id)
-	fmt.Println("My domain ID is ", domain_id)
+	//fmt.Println("My domain ID is ", domain_id)
 	if domain_id == 0 {
 		if !dbi.CheckProjectId(project_id) {
-			fmt.Println("Can't init crawler: no projects with id ", project_id)
+			log.Println("Can't init crawler: no projects with id ", project_id)
 			os.Exit(1)
 		}
 		dbi.AddDomain(domain, project_id)
@@ -440,7 +440,7 @@ func parseArgs(args []string) (map[string]string, bool) {
 	cl_arg_names := []string{"url", "depth", "log_level", "config_file", "project_id"}
 	var configMap map[string]string = map[string]string{}
 	for i := 0; i < min(len(cl_arg_names), len(args)-1); i++ {
-		fmt.Println("arg " + cl_arg_names[i] + " found, value is " + args[i+1])
+		//fmt.Println("arg " + cl_arg_names[i] + " found, value is " + args[i+1])
 		configMap[cl_arg_names[i]] = args[i+1]
 	}
 
@@ -464,7 +464,7 @@ func parseArgs(args []string) (map[string]string, bool) {
 		return nil, true
 	}
 	if _, ok := configMap["log_file"]; !ok {
-		configMap["log_level"] = "stdout"
+		configMap["log_file"] = "stdout"
 	}
 	return configMap, false
 }
