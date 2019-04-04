@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/PuerkitoBio/goquery"
 	"golang.org/x/net/html"
@@ -558,7 +559,9 @@ func main() {
 	//http.DefaultTransport = &http.Transport{Proxy: http.ProxyURL(proxyUrl)}
 	http.DefaultTransport.(*http.Transport).TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 
-	httpClient := &http.Client{}
+	timeout := time.Duration(5 * time.Second)
+
+	httpClient := &http.Client{Timeout: timeout}
 	req, _ := http.NewRequest("GET", configMap["url"], nil)
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:58.0) Gecko/20100101 Firefox/58.0")
 
